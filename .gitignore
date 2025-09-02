@@ -1,0 +1,7 @@
+__pycache__
+**/__pycache__
+.env
+service-account.json
+venv/
+opencv/data/
+downloads/*.mp4
