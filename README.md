@@ -2,7 +2,11 @@
 
 A Discord bot for managing Uma Musume club information through video processing and automated spreadsheet logging.
 
-## Demonstration
+## Youtube Preview
+
+https://www.youtube.com/watch?v=dNzNqTIrdrQ
+
+[![](http://img.youtube.com/vi/dNzNqTIrdrQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=dNzNqTIrdrQ)
 
 ## Features
 
