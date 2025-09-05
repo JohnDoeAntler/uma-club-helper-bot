@@ -8,3 +8,5 @@ google-auth-httplib2
 google-auth-oauthlib
 paddlepaddle
 opencv-python-headless
+rapidfuzz
+playwright

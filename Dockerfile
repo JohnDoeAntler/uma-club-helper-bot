@@ -13,6 +13,9 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install playwright
+RUN playwright install --force --with-deps
+
 # Copy the application code
 COPY . .
 
