@@ -16,18 +16,18 @@ def fuzzy_match(a: str, b: list[str]):
 
 async def input_name(page: Page, info: dict[str, any]):
     umamusumes_dict = await page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .umaSuggestions .umaSuggestion')].map(e => [e.getAttribute("data-uma-id"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
+        [...document.querySelectorAll('#umaPane > div.selected .umaSuggestions .umaSuggestion')].map(e => [e.getAttribute("data-uma-id"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
     ''')
     umamusumes = list(umamusumes_dict.keys())
     true_name = fuzzy_match(info["name"], umamusumes)
     umamusume_id = umamusumes_dict[true_name]
 
-    await page.locator('#umaPane > div:nth-child(1) input.umaSelectInput').focus()
-    await page.locator(f'#umaPane > div:nth-child(1) li.umaSuggestion[data-uma-id="{umamusume_id}"]').click()
+    await page.locator('#umaPane > div.selected input.umaSelectInput').focus()
+    await page.locator(f'#umaPane > div.selected li.umaSuggestion[data-uma-id="{umamusume_id}"]').click()
 
 async def input_skills(page: Page, info: dict[str, any]):
     skills_dict = await page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .skillList .skill')].map(e => [e.getAttribute("data-skillid"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
+        [...document.querySelectorAll('#umaPane > div.selected .skillList .skill')].map(e => [e.getAttribute("data-skillid"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
     ''')
     unique_skill_name = await page.evaluate('''
         document.querySelector('div.skill.skill-unique').innerText
@@ -44,17 +44,17 @@ async def input_skills(page: Page, info: dict[str, any]):
     skills_ids = [skills_dict[skill] for skill in true_skils]
 
     for skill_id in skills_ids:
-        await page.locator('#umaPane > div:nth-child(1) div.skill.addSkillButton').click()
-        await page.locator(f'#umaPane > div:nth-child(1) div.skill[data-skillid="{skill_id}"]').click()
+        await page.locator('#umaPane > div.selected div.skill.addSkillButton').click()
+        await page.locator(f'#umaPane > div.selected div.skill[data-skillid="{skill_id}"]').click()
 
 async def input_stats(page: Page, info: dict[str, any]):
     stat_headers = await page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseParams .horseParamHeader')].map(e => e.innerText.trim())
+        [...document.querySelectorAll('#umaPane > div.selected .horseParams .horseParamHeader')].map(e => e.innerText.trim())
     ''')
 
     for stat, value in info["stats"].items():
         index = len(stat_headers) + stat_headers.index(stat)
-        await page.locator(f'#umaPane > div:nth-child(1) .horseParams .horseParam:nth-child({index + 1}) input').fill(str(value))
+        await page.locator(f'#umaPane > div.selected .horseParams .horseParam:nth-child({index + 1}) input').fill(str(value))
 
 def number_to_distance(number: int):
     if number <= 1400:
@@ -76,16 +76,16 @@ async def input_preset(page: Page, preset: str):
 
 async def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any], style: str):
     style_options = await page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseStrategySelect option')].map(e => e.innerText).filter(e => e.trim())
+        [...document.querySelectorAll('#umaPane > div.selected .horseStrategySelect option')].map(e => e.innerText).filter(e => e.trim())
     ''')
 
     # set the style
     long_term_style = [s for s in style_options if s.startswith(style)][0]
-    await page.locator(f'#umaPane > div:nth-child(1) .horseStrategySelect').select_option(long_term_style)
+    await page.locator(f'#umaPane > div.selected .horseStrategySelect').select_option(long_term_style)
 
     # set the grade of the style
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"]').click()
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"] li[data-horse-aptitude="{info["aptitudes"][style]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"] li[data-horse-aptitude="{info["aptitudes"][style]}"]').click()
 
 async def input_surface_and_distance(page, info: dict[str, any], aptitude_dict: dict[str, any]):
     racetrack_name = await page.evaluate("document.querySelector('.racetrackName').innerText")
@@ -93,16 +93,16 @@ async def input_surface_and_distance(page, info: dict[str, any], aptitude_dict: 
     distance = number_to_distance(parse_only_numbers(racetrack_name))
 
     # surface
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"]').click()
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"] li[data-horse-aptitude="{info["aptitudes"][surface]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"] li[data-horse-aptitude="{info["aptitudes"][surface]}"]').click()
 
     # distance
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"]').click()
-    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"] li[data-horse-aptitude="{info["aptitudes"][distance]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"]').click()
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"] li[data-horse-aptitude="{info["aptitudes"][distance]}"]').click()
 
 async def compute_aptitude_dict(page: Page):
     return await page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseAptitudes > div')]
+        [...document.querySelectorAll('#umaPane > div.selected .horseAptitudes > div')]
             .map((e) => [e, e.querySelector('.horseAptitudeSelect')])
             .filter(([e, s]) => !!s)
             .map(([e, s]) => [e.innerText.split(' ')[0], s.getAttribute('tabindex')])
@@ -167,9 +167,12 @@ class PresetSelectView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author_id
 
-async def select_style(thread, author_id: int):
+async def select_style(thread, author_id: int, hint: str = ""):
     view = StyleSelectView(author_id)
-    prompt_msg = await thread.send("Select the style:", view=view)
+    if hint:
+        prompt_msg = await thread.send(f"Select the style for {hint}:", view=view)
+    else:
+        prompt_msg = await thread.send("Select the style:", view=view)
     await view.wait()
     await prompt_msg.edit(view=None)
     
@@ -213,73 +216,164 @@ async def setup_browser_and_page():
 
     return pw, browser, page
 
-async def extract_image_to_simulator(bot, message: discord.Message):
+async def attachment_check(message: discord.Message):
     if len(message.attachments) == 0:
-        await message.channel.send("No attachments found, expected a image of a veteran uma screenshot.", ephemeral=True, silent=True)
-        return
+        return []
 
-    attachment = message.attachments[0]
+    attachments = [attachment for attachment in message.attachments if attachment.content_type.startswith("image/")]
 
-    if not attachment.content_type.startswith("image/"):
-        await message.channel.send("The attachment is not a image, expected a image of a veteran uma screenshot.", ephemeral=True, silent=True)
-        return
-    
-    thread = await message.create_thread(name='analyzin...')
+    if not len(attachments):
+        return []
 
+    return attachments
+
+async def extract_attachment_info(bot, attachment: discord.Attachment) -> dict[str, any]:
     file_path = f'./downloads/{uuid.uuid4()}.{attachment.content_type.split("/")[1]}'
 
     try:
         await attachment.save(file_path)
-    except Exception as e:
-        await thread.edit(name='failed to analyze')
-        await thread.send(f"Failed to download video: {e}")
-        return
-    
-    try:
         info = await run_blocking(bot, extract_image, file_path)
-    except Exception as e:
-        await thread.edit(name='failed to analyze')
-        await thread.send(f"Failed to extract image: {e}")
-        return
+        return info
     finally:
         os.remove(file_path)
 
-    # debug log
-    stats = f"{info['stats']['Speed']}/{info['stats']['Stamina']}/{info['stats']['Power']}/{info['stats']['Guts']}/{info['stats']['Wit']}"
-    await thread.edit(name=f"{info['name']} ({stats}) by {message.author.name}")
-    await thread.send(f"```json\n{json.dumps(info, indent=2)}\n```")
+def hash_dict(info: dict[str, any]) -> int:
+    return hash(tuple(sorted(info.items())))
+
+async def extract_attachments(bot, attachments: list[discord.Attachment]) -> list[dict[str, any]]:
+    ret = {}
+
+    # extract info
+    for attachment in attachments:
+        try:
+            info = await extract_attachment_info(bot, attachment)
+            hash_info = hash(info["name"]) + hash_dict(info["stats"]) + hash_dict(info["aptitudes"])
+
+            if hash_info not in ret:
+                ret[hash_info] = info
+            else:
+                ret[hash_info]["skills"].extend(info["skills"])
+        except Exception:
+            pass
+
+    # remove duplicate skills
+    for info in ret.values():
+        info["skills"] = list(set(info["skills"]))
+
+    return list(ret.values())
+
+def get_uma_stats(uma: dict[str, any]):
+    return f"{uma['stats']['Speed']}/{uma['stats']['Stamina']}/{uma['stats']['Power']}/{uma['stats']['Guts']}/{uma['stats']['Wit']}"
+
+async def run_simulator_single(uma: dict[str, any], thread: discord.Thread, message: discord.Message):
+    await thread.edit(name=f"{uma['name']} ({get_uma_stats(uma)})")
+    await thread.send(f"```json\n{json.dumps(uma, indent=2)}\n```")
 
     # parallel tasks
-    style_future = select_style(thread, message.author.id)
+    future_list = []
 
     # initialize playwright
-    async def browser_future():
+    async def browser_init_and_page_init():
         pw, browser, page = await setup_browser_and_page()
 
         # input info
         presets = await get_presets(page)
 
-        async def input_info_future():
-            await input_name(page, info)
-            await input_stats(page, info)
-            await input_skills(page, info)
+        await input_name(page, uma)
+        await input_stats(page, uma)
+        await input_skills(page, uma)
 
-        preset_future = select_preset(thread, presets, message.author.id)
+        return pw, browser, page, presets
 
-        _, preset = await asyncio.gather(input_info_future(), preset_future)
-        return pw, browser, page, preset
-    
-    style, (pw, browser, page, preset) = await asyncio.gather(style_future, browser_future())
+    future_list.append(select_style(thread, message.author.id))
+    future_list.append(browser_init_and_page_init())
+    style, (pw, browser, page, presets) = await asyncio.gather(*future_list)
+
+    preset = await select_preset(thread, presets, message.author.id)
+    await input_preset(page, preset)
 
     aptitude_idx_dict = await compute_aptitude_dict(page)
-    await input_style(page, info, aptitude_idx_dict, style)
-    await input_preset(page, preset)
-    await input_surface_and_distance(page, info, aptitude_idx_dict)
+    await input_style(page, uma, aptitude_idx_dict, style)
+    await input_surface_and_distance(page, uma, aptitude_idx_dict)
     await simulate(page)
     
     screenshot = await page.screenshot()
     url = await copy_link(page)
     
-    await thread.send(f"url: {url}", file=discord.File(io.BytesIO(screenshot), filename="_.png"))
+    await thread.send(f"Simulator url: [here]({url})", file=discord.File(io.BytesIO(screenshot), filename="_.png"))
     await browser.close()
     await pw.stop()
+
+async def select_uma_slot(page: Page, slot: str):
+    await page.locator(f'#umaPane > div.selected div.umaTab:has-text("{slot}")').click()
+
+async def run_simulator_double(uma1: dict[str, any], uma2: dict[str, any], thread: discord.Thread, message: discord.Message):
+    await thread.edit(name=f"{uma1['name']} compared to {uma2['name']}")
+    await thread.send(f"```json\n{json.dumps(uma1, indent=2)}\n```\n```json\n{json.dumps(uma2, indent=2)}\n```")
+
+    # parallel tasks
+    future_list = []
+
+    # initialize playwright
+    async def browser_init_and_page_init():
+        pw, browser, page = await setup_browser_and_page()
+
+        # get presets
+        presets = await get_presets(page)
+
+        async def fill_data(slot, uma):
+            await select_uma_slot(page, slot)
+            await input_name(page, uma)
+            await input_stats(page, uma)
+            await input_skills(page, uma)
+
+        await fill_data('Umamusume 1', uma1)
+        await fill_data('Umamusume 2', uma2)
+        return pw, browser, page, presets
+
+    future_list.append(select_style(thread, message.author.id, f"`{uma1['name']} ({get_uma_stats(uma1)})`"))
+    future_list.append(select_style(thread, message.author.id, f"`{uma2['name']} ({get_uma_stats(uma2)})`"))
+    future_list.append(browser_init_and_page_init())
+    style1, style2, (pw, browser, page, presets) = await asyncio.gather(*future_list)
+
+    preset = await select_preset(thread, presets, message.author.id)
+    await input_preset(page, preset)
+
+    async def set_style_and_surface_and_distance(slot, uma, style):
+        await select_uma_slot(page, slot)
+        aptitude_idx_dict = await compute_aptitude_dict(page)
+        await input_style(page, uma, aptitude_idx_dict, style)
+        await input_surface_and_distance(page, uma, aptitude_idx_dict)
+
+    await set_style_and_surface_and_distance('Umamusume 1', uma1, style1)
+    await set_style_and_surface_and_distance('Umamusume 2', uma2, style2)
+    await simulate(page)
+    
+    screenshot = await page.screenshot()
+    url = await copy_link(page)
+    
+    await thread.send(f"Simulator url: [here]({url})", file=discord.File(io.BytesIO(screenshot), filename="_.png"))
+    await browser.close()
+    await pw.stop()
+
+async def extract_image_to_simulator(bot: discord.Client, message: discord.Message):
+    # attachment check
+    attachments = await attachment_check(message)
+    if not len(attachments):
+        await message.channel.send("No images found, expected at least one image of a veteran uma screenshot.", ephemeral=True, silent=True)
+
+    thread = await message.create_thread(name='analyzin...')
+    umas = await extract_attachments(bot, attachments)
+
+    if len(umas) == 0:
+        await thread.send("No umas found, expected at least one uma screenshot.", ephemeral=True, silent=True)
+        return
+    elif len(umas) == 1:
+        await run_simulator_single(umas[0], thread, message)
+        return
+    elif len(umas) == 2:
+        await run_simulator_double(umas[0], umas[1], thread, message)
+        return
+    else:
+        await thread.send("Too many umas found, currently not supported to run simulator for more than two umas.", ephemeral=True, silent=True)
+        return
