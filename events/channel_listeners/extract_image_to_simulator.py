@@ -361,6 +361,7 @@ async def extract_image_to_simulator(bot: discord.Client, message: discord.Messa
     attachments = await attachment_check(message)
     if not len(attachments):
         await message.channel.send("No images found, expected at least one image of a veteran uma screenshot.")
+        return
 
     thread = await message.create_thread(name='analyzin...')
     umas = await extract_attachments(bot, attachments)
