@@ -61,12 +61,12 @@ def format_data_for_codeblock(member_data):
     if not member_data:
         return "", ""
     
-    names = [member['name'] for member in member_data]
-    total_fans = [str(member['total_fans']) for member in member_data]
+    names = [f'"{member['name'].replace('"', '""')}"' for member in member_data]
+    total_fans = [f'"{member['total_fans'].replace('"', '""')}"' for member in member_data]
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    header_line = '\t'.join([''] + names)
-    data_line = '\t'.join([current_time] + total_fans)
+    header_line = ','.join([''] + names)
+    data_line = ','.join([current_time] + total_fans)
     
     return header_line, data_line
 
