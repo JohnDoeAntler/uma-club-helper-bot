@@ -3,103 +3,9 @@ from cv2.typing import MatLike
 from paddleocr import PaddleOCR
 import numpy as np
 import re
-
-ocr = None
-
-# copied
-def hex_to_bgr(hex_color):
-    hex_color = hex_color.lstrip('#')
-    r = int(hex_color[0:2], 16)
-    g = int(hex_color[2:4], 16) 
-    b = int(hex_color[4:6], 16)
-    return np.array([b, g, r])
-
-def init_paddleocr():
-    global ocr
-    ocr = PaddleOCR(
-        lang='en',
-        ocr_version='PP-OCRv5',
-        use_doc_orientation_classify=False, 
-        use_doc_unwarping=False, 
-        use_textline_orientation=False,
-        return_word_box=False,
-    )
-
-def is_paddleocr_initialized():
-    return ocr is not None
-
-def create_binary_mask(image: MatLike, target_colors: list[str], tolerance: int = 0) -> MatLike:
-    combined_mask = np.zeros(image.shape[:2], dtype=bool)
-    
-    for color in target_colors:
-        target_bgr = hex_to_bgr(color)
-        diff = np.abs(image.astype(np.int16) - target_bgr.astype(np.int16))
-        color_mask = np.all(diff <= tolerance, axis=2)
-        combined_mask = combined_mask | color_mask
-    
-    binary_image = np.zeros_like(image)
-    binary_image[combined_mask] = [255, 255, 255]
-    binary_image[~combined_mask] = [0, 0, 0]
-    
-    return binary_image
+from utils.opencv import create_binary_mask, remove_noise, find_white_regions, crop_image, ocr
 
 CLUB_HEADER_COLOR = "#7fcc0b"
-
-def find_white_regions(image: MatLike, threshold: float = 0.5, min_width: int = 50, min_height: int = 20) -> list[tuple[int, int, int, int]]:
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    bounding_boxes = []
-    
-    for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        
-        # cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        if w < min_width or h < min_height:
-            continue
-        
-        roi = gray[y:y+h, x:x+w]
-        white_pixels = np.sum(roi == 255)
-        total_pixels = roi.size
-        white_ratio = white_pixels / total_pixels
-        
-        if white_ratio >= threshold:
-            bounding_boxes.append((x, y, w, h))
-    
-    return bounding_boxes
-
-def remove_noise(image: MatLike, min_area: int = 50) -> MatLike:
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    result = image.copy()
-    result_gray = gray.copy()
-    
-    removed_count = 0
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if area < min_area:
-            cv2.fillPoly(result_gray, [contour], 0)
-            removed_count += 1
-    
-    result = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
-    
-    return result
-
-def crop_image(image: MatLike, box: tuple[int, int, int, int]):
-    x, y, w, h = box
-    return image[y:y+h, x:x+w]
-
-def parse_only_numbers(text: str) -> int:
-    ret = 0
-    for ch in text:
-        if ch.isdigit():
-            ret = ret * 10 + int(ch)
-    return ret
-# end of copied
-
 TEMPLATE_DOUBLE_CIRCLE = cv2.imread("opencv/assets/double-circle.png")
 TEMPLATE_DOUBLE_CIRCLE2 = cv2.imread("opencv/assets/double-circle2.png")
 TEMPLATE_DOUBLE_CIRCLE3 = cv2.imread("opencv/assets/double-circle3.png")
@@ -238,7 +144,6 @@ def parse_skill(image: MatLike, box: tuple[int, int, int, int]):
     
     return skill_name
 
-    
 def parse_skill_section(image: MatLike):
     p = posterization(image, 10)
 
@@ -361,12 +266,11 @@ def parse_stat(image: MatLike, box: tuple[int, int, int, int]):
             attribute = text
             break
 
-    value = None
+    value = 0
 
     for text in texts:
         if text.isdigit():
-            value = text
-            break
+            value = max(value, int(text))
 
     return attribute, value
 
@@ -417,148 +321,3 @@ def extract_image(path: str):
         "aptitudes": parse_aptitude_section(img),
         "skills": parse_skill_section(img),
     }
-
-from playwright.sync_api import sync_playwright
-from rapidfuzz import process, fuzz
-
-def fuzzy_match(a: str, b: list[str]):
-    best_match, _, _ = process.extractOne(a, b, scorer=fuzz.WRatio)
-    return best_match
-
-def input_name(page, info: dict[str, any]):
-    umamusumes_dict = page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .umaSuggestions .umaSuggestion')].map(e => [e.getAttribute("data-uma-id"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
-    ''')
-    umamusumes = list(umamusumes_dict.keys())
-    true_name = fuzzy_match(info["name"], umamusumes)
-    umamusume_id = umamusumes_dict[true_name]
-
-    page.locator('#umaPane > div:nth-child(1) input.umaSelectInput').focus()
-    page.locator(f'#umaPane > div:nth-child(1) li.umaSuggestion[data-uma-id="{umamusume_id}"]').click()
-
-def input_skills(page, info: dict[str, any]):
-    skills_dict = page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .skillList .skill')].map(e => [e.getAttribute("data-skillid"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
-    ''')
-    unique_skill_name = page.evaluate('''
-        document.querySelector('div.skill.skill-unique').innerText
-    ''')
-
-    skills = list(skills_dict.keys())
-    true_skils = []
-    for skill in info["skills"]:
-        match = fuzzy_match(skill, skills)
-        if match == unique_skill_name:
-            continue
-        true_skils.append(match)
-
-    skills_ids = [skills_dict[skill] for skill in true_skils]
-
-    for skill_id in skills_ids:
-        page.locator('#umaPane > div:nth-child(1) div.skill.addSkillButton').click()
-        page.locator(f'#umaPane > div:nth-child(1) div.skill[data-skillid="{skill_id}"]').click()
-
-def input_stats(page, info: dict[str, any]):
-    stat_headers = page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseParams .horseParamHeader')].map(e => e.innerText.trim())
-    ''')
-
-    for stat, value in info["stats"].items():
-        index = len(stat_headers) + stat_headers.index(stat)
-        page.locator(f'#umaPane > div:nth-child(1) .horseParams .horseParam:nth-child({index + 1}) input').fill(value)
-
-def number_to_distance(number: int):
-    if number <= 1400:
-        return "Sprint"
-    elif number <= 1800:
-        return "Mile"
-    elif number <= 2400:
-        return "Medium"
-    else:
-        return "Long"
-
-def get_presets(page):
-    return page.evaluate('''
-        [...document.querySelectorAll('#P0-0 option')].map(e => e.innerText).filter(e => e.trim())
-    ''')
-
-def input_preset(page, preset: str):
-    page.locator(f'#P0-0').select_option(preset)
-
-def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any], style: str):
-    style_options = page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseStrategySelect option')].map(e => e.innerText).filter(e => e.trim())
-    ''')
-
-    # set the style
-    long_term_style = [s for s in style_options if s.startswith(style)][0]
-    page.locator(f'#umaPane > div:nth-child(1) .horseStrategySelect').select_option(long_term_style)
-
-    # set the grade of the style
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"]').click()
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"] li[data-horse-aptitude="{info["aptitudes"][style]}"]').click()
-
-def input_surface_and_distance(page, info: dict[str, any], aptitude_dict: dict[str, any]):
-    racetrack_name = page.evaluate("document.querySelector('.racetrackName').innerText")
-    surface = "Dirt" if "Dirt" in racetrack_name else "Turf"
-    distance = number_to_distance(parse_only_numbers(racetrack_name))
-
-    # surface
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"]').click()
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"] li[data-horse-aptitude="{info["aptitudes"][surface]}"]').click()
-
-    # distance
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"]').click()
-    page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"] li[data-horse-aptitude="{info["aptitudes"][distance]}"]').click()
-
-def compute_aptitude_dict(page):
-    return page.evaluate('''
-        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseAptitudes > div')]
-            .map((e) => [e, e.querySelector('.horseAptitudeSelect')])
-            .filter(([e, s]) => !!s)
-            .map(([e, s]) => [e.innerText.split(' ')[0], s.getAttribute('tabindex')])
-            .reduce((a, [key, value]) => ({ ...a, [key]: value }), {})
-    ''')
-
-def main():
-    init_paddleocr()
-    info = extract_image("opencv/data/image4.png")
-
-    with sync_playwright() as p:
-        # goto the url
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        page.set_viewport_size({"width": 1920, "height": 1080})
-        page.goto("https://alpha123.github.io/uma-tools/umalator-global")
-        page.wait_for_timeout(1000)
-
-        input_name(page, info)
-        input_stats(page, info)
-        input_skills(page, info)
-
-        aptitude_dict = compute_aptitude_dict(page)
-
-        # get the list of preset (2025-08 CM 2025-09 CM)
-        presets = get_presets(page)
-
-        # ask player for the style and preset
-        style = input("Enter the style: ")
-        input_style(page, info, aptitude_dict, style)
-
-        # ask player for the preset
-        for i, preset in enumerate(presets):
-            print(f'{i}: {preset}')
-
-        preset_idx = input("Enter the preset: ")
-        selected_preset = presets[int(preset_idx)]
-        input_preset(page, selected_preset)
-        input_surface_and_distance(page, info, aptitude_dict)
-        page.screenshot(path="opencv/data/screenshot.png")
-        input('Press Enter to continue...')
-
-        browser.close()
-
-    cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    main()

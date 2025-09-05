@@ -2,7 +2,7 @@ from collections import Counter
 import cv2
 import numpy as np
 from cv2.typing import MatLike
-from paddleocr import PaddleOCR
+from utils.opencv import ocr
 
 # TODO: to further optimize the video parsing, we could capture the scrollbar to obtain the max height of the club lsit
 
@@ -24,23 +24,6 @@ ICON_I_GRADIENT_BOTTOM_COLOR = "#fafafa"
 LEADER_FLAG_COLOR = "#ef3c39"
 OFFICER_FLAG_COLOR = "#267fe9"
 MEMBER_FLAG_COLOR = "#5dca10"
-
-# helper functions
-ocr = None
-
-def init_paddleocr():
-    global ocr
-    ocr = PaddleOCR(
-        lang='en',
-        ocr_version='PP-OCRv5',
-        use_doc_orientation_classify=False, 
-        use_doc_unwarping=False, 
-        use_textline_orientation=False,
-        return_word_box=False,
-    )
-
-def is_paddleocr_initialized():
-    return ocr is not None
 
 # main functions
 
