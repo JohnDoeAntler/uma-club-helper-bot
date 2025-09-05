@@ -116,9 +116,9 @@ def guess_grade(image: np.ndarray):
 
 def remove_level_from_skill_name(skill_name: str):
     if 'Lvl' in skill_name:
-        return re.sub(r'Lvl\s*\d*', '', skill_name).strip()
+        return True, re.sub(r'Lvl\s*\d*', '', skill_name).strip()
 
-    return skill_name
+    return False, skill_name
 
 def parse_skill(image: MatLike, box: tuple[int, int, int, int]):
     skill_icon_width = int(box[2] * 0.15)
@@ -132,17 +132,17 @@ def parse_skill(image: MatLike, box: tuple[int, int, int, int]):
 
     texts = ocr.predict(crop)[0]["rec_texts"]
     skill_name = ' '.join(texts).strip()
-    skill_name = remove_level_from_skill_name(skill_name)
+    is_unique_skill, skill_name = remove_level_from_skill_name(skill_name)
 
     circle, double_circle = find_circle(crop)
 
     if double_circle is not None:
-        return skill_name + " ◎"
+        return is_unique_skill, skill_name + " ◎"
 
     if circle is not None:
-        return skill_name + " ○"
+        return is_unique_skill, skill_name + " ○"
     
-    return skill_name
+    return is_unique_skill, skill_name
 
 def parse_skill_section(image: MatLike):
     p = posterization(image, 10)
@@ -158,15 +158,20 @@ def parse_skill_section(image: MatLike):
     contours, _ = cv2.findContours(floodfilled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     boxes = [cv2.boundingRect(contour) for contour in contours]
 
+    unique_skills = []
     skills = []
 
     for box in boxes:
         if box[2] / box[3] < 5:
             continue
 
-        skills.append(parse_skill(image, box))
+        is_unique_skill, skill_name = parse_skill(image, box)
+        if is_unique_skill:
+            unique_skills.append(skill_name)
+        else:
+            skills.append(skill_name)
     
-    return skills
+    return unique_skills, skills
 
 APTITUDES = [
     "Turf",
@@ -314,10 +319,12 @@ def extract_image(path: str):
     ])
     # please resize the height to 960 with keeping the aspect ratio
     img = cv2.resize(img, (int(img.shape[1] * 960 / img.shape[0]), 960))
+    unique_skills, skills = parse_skill_section(img)
 
     return {
         "name": parse_name(img),
         "stats": parse_stat_section(img),
         "aptitudes": parse_aptitude_section(img),
-        "skills": parse_skill_section(img),
+        "unique_skills": unique_skills,
+        "skills": skills,
     }
