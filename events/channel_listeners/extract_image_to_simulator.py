@@ -363,10 +363,11 @@ async def extract_image_to_simulator(bot: discord.Client, message: discord.Messa
         await message.channel.send("No images found, expected at least one image of a veteran uma screenshot.")
         return
 
-    thread = await message.create_thread(name='analyzin...')
+    thread = await message.create_thread(name='analyzing...')
     umas = await extract_attachments(bot, attachments)
 
     if len(umas) == 0:
+        await thread.edit(name='failed analysis')
         await thread.send("No umas found, expected at least one uma screenshot.")
         return
     elif len(umas) == 1:
@@ -376,5 +377,6 @@ async def extract_image_to_simulator(bot: discord.Client, message: discord.Messa
         await run_simulator_double(umas[0], umas[1], thread, message)
         return
     else:
+        await thread.edit(name='failed analysis')
         await thread.send("Too many umas found, currently not supported to run simulator for more than two umas.")
         return
