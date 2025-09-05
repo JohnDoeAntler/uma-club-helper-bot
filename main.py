@@ -1,6 +1,6 @@
-from opencv.club_video_parsing import init_paddleocr
+from utils.opencv import init_paddleocr
 from utils.config import get_bot_token
-from utils.discord import get_client, get_tree, init_client, init_command_tree
+from utils.discord import get_client, init_client, init_command_tree
 from utils.loader import auto_load_commands, auto_load_events
 from utils.spreadsheet import init_google_credentials, init_google_sheets_client
 
