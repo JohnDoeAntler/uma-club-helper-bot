@@ -1,0 +1,285 @@
+import discord
+import uuid
+import json
+from playwright.async_api import Browser, Page, PlaywrightContextManager, async_playwright
+from rapidfuzz import process, fuzz
+from utils.parse import parse_only_numbers
+from opencv.veteran_umamusume_parsing import extract_image
+from utils.blocking import run_blocking
+import os
+import io
+import asyncio
+
+def fuzzy_match(a: str, b: list[str]):
+    best_match, _, _ = process.extractOne(a, b, scorer=fuzz.WRatio)
+    return best_match
+
+async def input_name(page: Page, info: dict[str, any]):
+    umamusumes_dict = await page.evaluate('''
+        [...document.querySelectorAll('#umaPane > div:nth-child(1) .umaSuggestions .umaSuggestion')].map(e => [e.getAttribute("data-uma-id"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
+    ''')
+    umamusumes = list(umamusumes_dict.keys())
+    true_name = fuzzy_match(info["name"], umamusumes)
+    umamusume_id = umamusumes_dict[true_name]
+
+    await page.locator('#umaPane > div:nth-child(1) input.umaSelectInput').focus()
+    await page.locator(f'#umaPane > div:nth-child(1) li.umaSuggestion[data-uma-id="{umamusume_id}"]').click()
+
+async def input_skills(page: Page, info: dict[str, any]):
+    skills_dict = await page.evaluate('''
+        [...document.querySelectorAll('#umaPane > div:nth-child(1) .skillList .skill')].map(e => [e.getAttribute("data-skillid"), e.innerText]).reduce((a, [id, name]) => ({ ...a, [name]: id }), {})
+    ''')
+    unique_skill_name = await page.evaluate('''
+        document.querySelector('div.skill.skill-unique').innerText
+    ''')
+
+    skills = list(skills_dict.keys())
+    true_skils = []
+    for skill in info["skills"]:
+        match = fuzzy_match(skill, skills)
+        if match == unique_skill_name:
+            continue
+        true_skils.append(match)
+
+    skills_ids = [skills_dict[skill] for skill in true_skils]
+
+    for skill_id in skills_ids:
+        await page.locator('#umaPane > div:nth-child(1) div.skill.addSkillButton').click()
+        await page.locator(f'#umaPane > div:nth-child(1) div.skill[data-skillid="{skill_id}"]').click()
+
+async def input_stats(page: Page, info: dict[str, any]):
+    stat_headers = await page.evaluate('''
+        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseParams .horseParamHeader')].map(e => e.innerText.trim())
+    ''')
+
+    for stat, value in info["stats"].items():
+        index = len(stat_headers) + stat_headers.index(stat)
+        await page.locator(f'#umaPane > div:nth-child(1) .horseParams .horseParam:nth-child({index + 1}) input').fill(str(value))
+
+def number_to_distance(number: int):
+    if number <= 1400:
+        return "Sprint"
+    elif number <= 1800:
+        return "Mile"
+    elif number <= 2400:
+        return "Medium"
+    else:
+        return "Long"
+
+async def get_presets(page: Page):
+    return await page.evaluate('''
+        [...document.querySelectorAll('#P0-0 option')].map(e => e.innerText).filter(e => e.trim())
+    ''')
+
+async def input_preset(page: Page, preset: str):
+    await page.locator(f'#P0-0').select_option(preset)
+
+async def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any], style: str):
+    style_options = await page.evaluate('''
+        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseStrategySelect option')].map(e => e.innerText).filter(e => e.trim())
+    ''')
+
+    # set the style
+    long_term_style = [s for s in style_options if s.startswith(style)][0]
+    await page.locator(f'#umaPane > div:nth-child(1) .horseStrategySelect').select_option(long_term_style)
+
+    # set the grade of the style
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"]').click()
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Style"]}"] li[data-horse-aptitude="{info["aptitudes"][style]}"]').click()
+
+async def input_surface_and_distance(page, info: dict[str, any], aptitude_dict: dict[str, any]):
+    racetrack_name = await page.evaluate("document.querySelector('.racetrackName').innerText")
+    surface = "Dirt" if "Dirt" in racetrack_name else "Turf"
+    distance = number_to_distance(parse_only_numbers(racetrack_name))
+
+    # surface
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"]').click()
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Surface"]}"] li[data-horse-aptitude="{info["aptitudes"][surface]}"]').click()
+
+    # distance
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"]').click()
+    await page.locator(f'#umaPane > div:nth-child(1) div.horseAptitudeSelect[tabindex="{aptitude_dict["Distance"]}"] li[data-horse-aptitude="{info["aptitudes"][distance]}"]').click()
+
+async def compute_aptitude_dict(page: Page):
+    return await page.evaluate('''
+        [...document.querySelectorAll('#umaPane > div:nth-child(1) .horseAptitudes > div')]
+            .map((e) => [e, e.querySelector('.horseAptitudeSelect')])
+            .filter(([e, s]) => !!s)
+            .map(([e, s]) => [e.innerText.split(' ')[0], s.getAttribute('tabindex')])
+            .reduce((a, [key, value]) => ({ ...a, [key]: value }), {})
+    ''')
+
+class StyleSelectView(discord.ui.View):
+    def __init__(self, author_id):
+        super().__init__(timeout=60)
+        self.value = None
+        self.author_id = author_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.author_id
+
+    @discord.ui.button(label="Front", style=discord.ButtonStyle.primary)
+    async def front(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = "Front"
+        await interaction.response.defer()
+        self.stop()
+
+    @discord.ui.button(label="Pace", style=discord.ButtonStyle.primary)
+    async def pace(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = "Pace"
+        await interaction.response.defer()
+        self.stop()
+
+    @discord.ui.button(label="Late", style=discord.ButtonStyle.primary)
+    async def late(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = "Late"
+        await interaction.response.defer()
+        self.stop()
+
+    @discord.ui.button(label="End", style=discord.ButtonStyle.primary)
+    async def end(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = "End"
+        await interaction.response.defer()
+        self.stop()
+
+class PresetSelectView(discord.ui.View):
+    def __init__(self, presets: list[str], author_id: int):
+        super().__init__(timeout=60)
+        self.value = None
+        self.author_id = author_id
+        
+        for i, preset in enumerate(presets[:25]):
+            button = discord.ui.Button(
+                label=preset[:80],
+                style=discord.ButtonStyle.secondary,
+                custom_id=str(i)
+            )
+            button.callback = self.create_callback(preset)
+            self.add_item(button)
+
+    def create_callback(self, preset: str):
+        async def callback(interaction: discord.Interaction):
+            self.value = preset
+            await interaction.response.defer()
+            self.stop()
+        return callback
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.author_id
+
+async def select_style(thread, author_id: int):
+    view = StyleSelectView(author_id)
+    prompt_msg = await thread.send("Select the style:", view=view)
+    await view.wait()
+    await prompt_msg.edit(view=None)
+    
+    if not view.value:
+        await thread.send("No style selected, defaulting to Front.")
+        return "Front"
+    
+    return view.value
+
+async def select_preset(thread, presets: list[str], author_id: int):
+    view = PresetSelectView(presets, author_id)
+    prompt_msg = await thread.send("Select the preset:", view=view)
+    await view.wait()
+    await prompt_msg.edit(view=None)
+    
+    if not view.value:
+        await thread.send("No preset selected, defaulting to first preset.")
+        return presets[0]
+    
+    return view.value
+
+async def simulate(page: Page, samples=10):
+    await page.locator('input#nsamples').fill(str(samples))
+    await page.locator('button#run').click()
+    await page.wait_for_timeout(1000)
+
+async def copy_link(page: Page):
+    await page.locator('a:has-text("Copy link")').click()
+    return await page.evaluate('''
+        navigator.clipboard.readText()
+    ''')
+
+async def setup_browser_and_page():
+    pw = await async_playwright().start()
+    browser = await pw.chromium.launch()
+    context = await browser.new_context(permissions=["clipboard-read", "clipboard-write"])
+    page = await context.new_page()
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    await page.goto("https://alpha123.github.io/uma-tools/umalator-global")
+    await page.wait_for_timeout(1000)
+
+    return pw, browser, page
+
+async def extract_image_to_simulator(bot, message: discord.Message):
+    if len(message.attachments) == 0:
+        await message.channel.send("No attachments found, expected a image of a veteran uma screenshot.", ephemeral=True, silent=True)
+        return
+
+    attachment = message.attachments[0]
+
+    if not attachment.content_type.startswith("image/"):
+        await message.channel.send("The attachment is not a image, expected a image of a veteran uma screenshot.", ephemeral=True, silent=True)
+        return
+    
+    thread = await message.create_thread(name='analyzin...')
+
+    file_path = f'./downloads/{uuid.uuid4()}.{attachment.content_type.split("/")[1]}'
+
+    try:
+        await attachment.save(file_path)
+    except Exception as e:
+        await thread.edit(name='failed to analyze')
+        await thread.send(f"Failed to download video: {e}")
+        return
+    
+    try:
+        info = await run_blocking(bot, extract_image, file_path)
+    except Exception as e:
+        await thread.edit(name='failed to analyze')
+        await thread.send(f"Failed to extract image: {e}")
+        return
+    finally:
+        os.remove(file_path)
+
+    # debug log
+    stats = f"{info['stats']['Speed']}/{info['stats']['Stamina']}/{info['stats']['Power']}/{info['stats']['Guts']}/{info['stats']['Wit']}"
+    await thread.edit(name=f"{info['name']} ({stats}) by {message.author.name}")
+    await thread.send(f"```json\n{json.dumps(info, indent=2)}\n```")
+
+    # parallel tasks
+    style_future = select_style(thread, message.author.id)
+
+    # initialize playwright
+    async def browser_future():
+        pw, browser, page = await setup_browser_and_page()
+
+        # input info
+        presets = await get_presets(page)
+
+        async def input_info_future():
+            await input_name(page, info)
+            await input_stats(page, info)
+            await input_skills(page, info)
+
+        preset_future = select_preset(thread, presets, message.author.id)
+
+        _, preset = await asyncio.gather(input_info_future(), preset_future)
+        return pw, browser, page, preset
+    
+    style, (pw, browser, page, preset) = await asyncio.gather(style_future, browser_future())
+
+    aptitude_idx_dict = await compute_aptitude_dict(page)
+    await input_style(page, info, aptitude_idx_dict, style)
+    await input_preset(page, preset)
+    await input_surface_and_distance(page, info, aptitude_idx_dict)
+    await simulate(page)
+    
+    screenshot = await page.screenshot()
+    url = await copy_link(page)
+    
+    await thread.send(f"url: {url}", file=discord.File(io.BytesIO(screenshot), filename="_.png"))
+    await browser.close()
+    await pw.stop()
