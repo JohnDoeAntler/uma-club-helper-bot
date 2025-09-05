@@ -2,7 +2,7 @@ import discord
 from discord.ext.commands import has_permissions
 from utils.db import SessionLocal, ChannelConfig
 from utils.club_selection import handle_club_selection, select_club_with_reactions
-from utils.discord import get_tree
+from utils.discord import command
 
 def setup_channel_for_club(channel_id: str, club_id: int, created_by: str):
     session = SessionLocal()
@@ -79,6 +79,6 @@ async def handle_multiple_clubs(interaction, clubs):
         await message.edit(embed=success_embed)
 
 @has_permissions(administrator=True)
-@get_tree().command(name='setup-channel-club-records', description='Setup channel for storing club records')
+@command(name='setup-channel-club-records', description='Setup channel for storing club records')
 async def setup_channel_command(interaction: discord.Interaction):
     await handle_club_selection(interaction, handle_single_club, handle_multiple_clubs)

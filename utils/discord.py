@@ -18,8 +18,15 @@ _tree: Optional[CommandTree] = None
 
 def init_command_tree():
     global _tree
-    global _client
     _tree = CommandTree(_client)
 
 def get_tree():
     return _tree
+
+# helper functions
+
+def event(func=None, **kwargs):
+    return _client.event(func, **kwargs)
+
+def command(**kwargs):
+    return _tree.command(**kwargs)

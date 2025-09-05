@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext.commands import has_permissions
 from utils.db import SessionLocal, Club
 from utils.club_selection import handle_club_selection, select_club_with_reactions
-from utils.discord import get_tree
+from utils.discord import command
 import copy
 
 def enable_club_logging(club_id: int, spreadsheet_id: str):
@@ -144,7 +144,7 @@ async def handle_multiple_clubs_disable(interaction, clubs):
             await message.edit(embed=success_embed)
 
 @has_permissions(administrator=True)
-@get_tree().command(name='enable-spreadsheet-logging', description='Enable spreadsheet logging for a club')
+@command(name='enable-spreadsheet-logging', description='Enable spreadsheet logging for a club')
 @app_commands.describe(spreadsheet_id='The Google Sheets spreadsheet ID')
 async def enable_spreadsheet_logging_command(interaction: discord.Interaction, spreadsheet_id: str):
     async def single_handler(interaction, club):
@@ -156,7 +156,7 @@ async def enable_spreadsheet_logging_command(interaction: discord.Interaction, s
     await handle_club_selection(interaction, single_handler, multi_handler)
 
 @has_permissions(administrator=True)
-@get_tree().command(name='disable-spreadsheet-logging', description='Disable spreadsheet logging for a club')
+@command(name='disable-spreadsheet-logging', description='Disable spreadsheet logging for a club')
 async def disable_spreadsheet_logging_command(interaction: discord.Interaction):
     async def single_handler(interaction, club):
         await handle_single_club_disable(interaction, club)

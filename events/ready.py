@@ -1,12 +1,11 @@
 import discord
 from utils.loader import sync_commands
 from utils.db import init_db, engine, SessionLocal
-from utils.discord import get_client
+from utils.discord import event, get_client
 
-client = get_client()
-
-@client.event
+@event
 async def on_ready():
+    client = get_client()
     print(f'{client.user} has connected to Discord!')
     print(f'Bot ID: {client.user.id}')
     

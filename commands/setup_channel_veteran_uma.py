@@ -1,7 +1,7 @@
 import discord
 from discord.ext.commands import has_permissions
 from utils.db import SessionLocal, ChannelConfig
-from utils.discord import get_tree
+from utils.discord import command
 
 def toggle_channel_for_veteran_uma(channel_id: str, created_by: str):
     session = SessionLocal()
@@ -32,7 +32,7 @@ def toggle_channel_for_veteran_uma(channel_id: str, created_by: str):
         session.close()
 
 @has_permissions(administrator=True)
-@get_tree().command(name='setup-channel-veteran-uma', description='Setup channel for processing veteran uma screenshots')
+@command(name='setup-channel-veteran-uma', description='Setup channel for processing veteran uma screenshots')
 async def setup_channel_veteran_uma_command(interaction: discord.Interaction):
     try:
         channel_id = str(interaction.channel.id)

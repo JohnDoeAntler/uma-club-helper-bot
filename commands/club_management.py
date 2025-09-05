@@ -2,11 +2,10 @@ import discord
 from discord.ext.commands import has_permissions
 from utils.db import SessionLocal, Club
 from discord import app_commands
-
-from utils.discord import get_tree
+from utils.discord import command
 
 @has_permissions(administrator=True)
-@get_tree().command(name='create-club', description='Create a new club')
+@command(name='create-club', description='Create a new club')
 @app_commands.describe(club_name='Name of the club to create')
 async def create_club_command(interaction: discord.Interaction, club_name: str):
     guild_id = str(interaction.guild_id)
@@ -33,7 +32,7 @@ async def create_club_command(interaction: discord.Interaction, club_name: str):
         session.close()
 
 @has_permissions(administrator=True)
-@get_tree().command(name='list-clubs', description='List all clubs in this server')
+@command(name='list-clubs', description='List all clubs in this server')
 async def list_clubs_command(interaction: discord.Interaction):
     guild_id = str(interaction.guild_id)
     
@@ -60,7 +59,7 @@ async def list_clubs_command(interaction: discord.Interaction):
         session.close()
 
 @has_permissions(administrator=True)
-@get_tree().command(name='delete-club', description='Delete a club')
+@command(name='delete-club', description='Delete a club')
 @app_commands.describe(club_name='Name of the club to delete')
 async def delete_club_command(interaction: discord.Interaction, club_name: str):
     guild_id = str(interaction.guild_id)

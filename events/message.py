@@ -2,7 +2,7 @@ import discord
 from utils.db import SessionLocal, ChannelConfig, Club
 from .channel_listeners.extract_video_to_club_info import extract_video_to_club_info
 from .channel_listeners.extract_image_to_simulator import extract_image_to_simulator
-from utils.discord import get_client
+from utils.discord import event, get_client
 import asyncio
 
 async def handle_purpose(client, message: discord.Message, purpose: str, club):
@@ -11,7 +11,7 @@ async def handle_purpose(client, message: discord.Message, purpose: str, club):
     if purpose == "veteran_uma":
         await extract_image_to_simulator(client, message)
 
-@get_client().event
+@event
 async def on_message(message: discord.Message):
     client = get_client()
 
