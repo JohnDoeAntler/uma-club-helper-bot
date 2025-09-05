@@ -10,7 +10,6 @@ def init_client() -> Client:
     intents = Intents.default()
     intents.message_content = True
     _client = Client(intents=intents)
-    print('it should be fucking assigned:', _client)
 
 def get_client():
     return _client
