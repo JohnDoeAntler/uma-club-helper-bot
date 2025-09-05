@@ -26,7 +26,7 @@ async def on_message(message: discord.Message):
     session = SessionLocal()
 
     try:
-        configs = session.query(ChannelConfig).join(Club).filter(
+        configs = session.query(ChannelConfig).outerjoin(Club).filter(
             ChannelConfig.channel_id == channel_id
         ).all()
         
