@@ -1,11 +1,16 @@
 import discord
 from discord.ext.commands import has_permissions
+from utils.config import get_env
 from utils.db import engine, Base
 from utils.discord import get_tree
 
 @has_permissions(administrator=True)
 @get_tree().command(name='nuke-db', description='[DEV] Drop and recreate all database tables')
 async def handle_nuke_command(interaction: discord.Interaction):
+    if get_env() != 'DEV':
+        await interaction.response.send_message("This command is only available in development environment.", ephemeral=True)
+        return
+
     try:
         await interaction.response.defer(ephemeral=True)
         
