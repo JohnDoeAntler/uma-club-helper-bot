@@ -83,36 +83,41 @@ def find_circle(image: MatLike):
     return max_circle, max_double_circle
 
 # rgb format
-S_COLOR = (255,198,28) # ok
-A_COLOR = (255,141,56) # ok
-B_COLOR = (255,113,170) # ok
-C_COLOR = (141,226,113) # ok
-D_COLOR = (113,198,255) # ok
-E_COLOR = (226,113,255) # ok
-F_COLOR = (170,141,255) # ok
-G_COLOR = (198,198,198) # ok
+S_COLOR = (88,170,205) # ok
+A_COLOR = (93,144,214) # ok
+B_COLOR = (135,108,200) # ok
+C_COLOR = (106,197,128) # ok
+D_COLOR = (222,181,107) # ok
+E_COLOR = (212,112,187) # ok
+F_COLOR = (157,96,100) # ok
+G_COLOR = (223,222,224) # ok
 
 def to_bgr(arr):
     return (arr[2], arr[1], arr[0])
 
 def guess_grade(image: np.ndarray):
-    colors = {
-        'S': S_COLOR,
-        'A': A_COLOR,
-        'B': B_COLOR,
-        'C': C_COLOR,
-        'D': D_COLOR,
-        'E': E_COLOR,
-        'F': F_COLOR,
-        'G': G_COLOR,
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    saturation = hsv_image[:, :, 1]
+    mask = saturation > (1/3 * 255) # only keep the pixels with saturation > 1/3
+    
+    if np.any(mask):
+        average_color = np.mean(image[mask], axis=0)
+    else:
+        average_color = np.mean(image, axis=(0, 1))
+    
+    similarities = {
+        'S': np.linalg.norm(average_color - S_COLOR),
+        'A': np.linalg.norm(average_color - A_COLOR),
+        'B': np.linalg.norm(average_color - B_COLOR),
+        'C': np.linalg.norm(average_color - C_COLOR),
+        'D': np.linalg.norm(average_color - D_COLOR),
+        'E': np.linalg.norm(average_color - E_COLOR),
+        'F': np.linalg.norm(average_color - F_COLOR),
+        'G': np.linalg.norm(average_color - G_COLOR),
     }
 
-    for grade, color in colors.items():
-        bgr = to_bgr(color)
-        if np.any(np.all(image == bgr, axis=-1)):
-            return grade
-    
-    return 'G'
+    return min(similarities, key=similarities.get)
 
 def remove_level_from_skill_name(skill_name: str):
     if 'Lvl' in skill_name:
