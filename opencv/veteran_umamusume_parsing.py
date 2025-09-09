@@ -153,6 +153,7 @@ def parse_skill_section(image: MatLike):
     # turn non-black to fucking pure white
     mask = np.any(floodfilled != [0, 0, 0], axis=-1)  # True where pixel != black
     floodfilled[mask] = [255, 255, 255]
+    floodfilled = remove_noise(floodfilled, 3000)
 
     floodfilled = cv2.cvtColor(floodfilled, cv2.COLOR_BGR2GRAY)
     contours, _ = cv2.findContours(floodfilled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
