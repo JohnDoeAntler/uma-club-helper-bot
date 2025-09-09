@@ -194,7 +194,7 @@ async def select_preset(thread, presets: list[str], author_id: int):
     
     return view.value
 
-async def simulate(page: Page, samples=10):
+async def simulate(page: Page, samples=100):
     await page.locator('input#nsamples').fill(str(samples))
     await page.locator('button#run').click()
     await page.wait_for_timeout(1000)
