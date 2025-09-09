@@ -17,7 +17,7 @@ CIRCLE_TEMPLATES = [TEMPLATE_CIRCLE, TEMPLATE_CIRCLE2, TEMPLATE_CIRCLE3]
 DOUBLE_CIRCLE_TEMPLATES = [TEMPLATE_DOUBLE_CIRCLE, TEMPLATE_DOUBLE_CIRCLE2, TEMPLATE_DOUBLE_CIRCLE3]
 
 def find_club_header(image: MatLike):
-    step1 = create_binary_mask(image, [CLUB_HEADER_COLOR], 50)
+    step1 = create_binary_mask(image, [CLUB_HEADER_COLOR], 60)
     step2 = remove_noise(step1, 4000)
 
     boxes = find_white_regions(
