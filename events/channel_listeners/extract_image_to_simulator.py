@@ -308,7 +308,7 @@ async def select_uma_slot(page: Page, slot: str):
     await page.locator(f'#umaPane > div.selected div.umaTab:has-text("{slot}")').click()
 
 async def run_simulator_double(uma1: dict[str, any], uma2: dict[str, any], thread: discord.Thread, message: discord.Message):
-    await thread.edit(name=f"{uma1['name']} compared to {uma2['name']}")
+    await thread.edit(name=f"{uma1['name']} compared to {uma2['name']}"[:96])
     await thread.send(f"```json\n{json.dumps(uma1, indent=2)}\n```\n```json\n{json.dumps(uma2, indent=2)}\n```")
 
     # parallel tasks
