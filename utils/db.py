@@ -49,6 +49,26 @@ class ChannelConfig(Base):
     # Relationships
     club = relationship("Club", back_populates="channel_configs")
 
+class Preset(Base):
+    __tablename__ = 'preset'
+
+    # do not touch, primary key
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # custom name
+    name = Column(String, nullable=False)
+
+    # select from umalator
+    track_name = Column(String, nullable=False)
+    track_length = Column(String, nullable=False)
+    ground = Column(String, nullable=False)
+    weather = Column(String, nullable=False)
+    season = Column(String, nullable=False)
+
+    # creator info
+    created_by = Column(String, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
 # Database setup
 engine = create_engine(get_database_url(), pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(bind=engine)

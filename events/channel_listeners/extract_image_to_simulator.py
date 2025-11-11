@@ -3,6 +3,7 @@ import uuid
 import json
 from playwright.async_api import Browser, Page, PlaywrightContextManager, async_playwright
 from rapidfuzz import process, fuzz
+from utils.db import Preset, SessionLocal
 from utils.parse import parse_only_numbers
 from opencv.veteran_umamusume_parsing import extract_image
 from utils.blocking import run_blocking
@@ -71,8 +72,35 @@ async def get_presets(page: Page):
         [...document.querySelectorAll('#P0-0 option')].map(e => e.innerText).filter(e => e.trim())
     ''')
 
-async def input_preset(page: Page, preset: str):
-    await page.locator(f'#P0-0').select_option(preset)
+async def select_track_name(page: Page, track_name: str):
+    await page.locator('.trackSelect > select[tabIndex="2"]').select_option(track_name)
+
+async def select_track_length(page: Page, track_length: str):
+    await page.locator('.trackSelect > select[tabIndex="3"]').select_option(track_length)
+
+async def select_ground(page: Page, ground: str):
+    await page.locator('select.groundSelect').select_option(ground)
+
+async def select_weather(page: Page, weather: str):
+    await page.locator(f'div.weatherSelect > img[title="{weather}"]').click()
+
+async def select_season(page: Page, season: str):
+    await page.locator(f'div.seasonSelect > img[title="{season}"]').click()
+
+async def input_preset(page: Page, preset: str, custom_presets: list[Preset]):
+    if not preset.startswith("*"):
+        await page.locator(f'#P0-0').select_option(preset)
+        return
+    
+    # remove the asterisk
+    preset_name = preset[1:]
+    custom_preset = [preset for preset in custom_presets if preset.name == preset_name][0]
+
+    await select_track_name(page, custom_preset.track_name)
+    await select_track_length(page, custom_preset.track_length)
+    await select_ground(page, custom_preset.ground)
+    await select_weather(page, custom_preset.weather)
+    await select_season(page, custom_preset.season)
 
 async def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any], style: str):
     style_options = await page.evaluate('''
@@ -182,8 +210,8 @@ async def select_style(thread, author_id: int, hint: str = ""):
     
     return view.value
 
-async def select_preset(thread, presets: list[str], author_id: int):
-    view = PresetSelectView(presets, author_id)
+async def select_preset(thread, presets: list[str], custom_presets: list[Preset], author_id: int):
+    view = PresetSelectView(presets + [f"*{preset.name}" for preset in custom_presets], author_id)
     prompt_msg = await thread.send("Select the preset:", view=view)
     await view.wait()
     await prompt_msg.edit(view=None)
@@ -265,6 +293,14 @@ async def extract_attachments(bot, attachments: list[discord.Attachment]) -> lis
 def get_uma_stats(uma: dict[str, any]):
     return f"{uma['stats']['Speed']}/{uma['stats']['Stamina']}/{uma['stats']['Power']}/{uma['stats']['Guts']}/{uma['stats']['Wit']}"
 
+def get_custom_presets():
+    session = SessionLocal()
+    try:
+        presets = session.query(Preset).all()
+        return [preset for preset in presets]
+    finally:
+        session.close()
+
 async def run_simulator_single(uma: dict[str, any], thread: discord.Thread, message: discord.Message):
     await thread.edit(name=f"{uma['name']} ({get_uma_stats(uma)})")
     await thread.send(f"```json\n{json.dumps(uma, indent=2)}\n```")
@@ -288,9 +324,11 @@ async def run_simulator_single(uma: dict[str, any], thread: discord.Thread, mess
     future_list.append(select_style(thread, message.author.id))
     future_list.append(browser_init_and_page_init())
     style, (pw, browser, page, presets) = await asyncio.gather(*future_list)
+    custom_presets = get_custom_presets()
 
-    preset = await select_preset(thread, presets, message.author.id)
-    await input_preset(page, preset)
+    preset = await select_preset(thread, presets, custom_presets, message.author.id)
+
+    await input_preset(page, preset, custom_presets)
 
     aptitude_idx_dict = await compute_aptitude_dict(page)
     await input_style(page, uma, aptitude_idx_dict, style)
@@ -335,9 +373,10 @@ async def run_simulator_double(uma1: dict[str, any], uma2: dict[str, any], threa
     future_list.append(select_style(thread, message.author.id, f"`{uma2['name']} ({get_uma_stats(uma2)})`"))
     future_list.append(browser_init_and_page_init())
     style1, style2, (pw, browser, page, presets) = await asyncio.gather(*future_list)
+    custom_presets = get_custom_presets()
 
-    preset = await select_preset(thread, presets, message.author.id)
-    await input_preset(page, preset)
+    preset = await select_preset(thread, presets, custom_presets, message.author.id)
+    await input_preset(page, preset, custom_presets)
 
     async def set_style_and_surface_and_distance(slot, uma, style):
         await select_uma_slot(page, slot)
