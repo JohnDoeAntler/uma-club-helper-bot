@@ -43,11 +43,12 @@ async def get_seasons(page: Page):
     ''')
 
 class OptionSelectView(discord.ui.View):
-    def __init__(self, options: list[str], author_id: int, prompt: str = "Select an option:"):
+    def __init__(self, options: list[str], author_id: int, prompt: str = "Select an option:", message: discord.Message = None):
         super().__init__(timeout=60)
         self.value = None
         self.author_id = author_id
         self.prompt = prompt
+        self.message = message
         
         for i, option in enumerate(options[:25]):
             button = discord.ui.Button(
@@ -68,20 +69,31 @@ class OptionSelectView(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author_id
 
-async def select_option(interaction: discord.Interaction, options: list[str], prompt: str = "Select an option:") -> str:
+async def select_option(interaction: discord.Interaction, options: list[str], prompt: str = "Select an option:", message: discord.Message = None) -> tuple[str, discord.Message]:
     if not options:
-        await interaction.followup.send("No options available.", ephemeral=True)
-        return None
+        if message:
+            await message.edit(content="No options available.", view=None)
+        else:
+            await interaction.followup.send("No options available.", ephemeral=True)
+        return None, message
     
-    view = OptionSelectView(options, interaction.user.id, prompt)
-    await interaction.followup.send(prompt, view=view, ephemeral=True)
+    view = OptionSelectView(options, interaction.user.id, prompt, message)
+    
+    if message:
+        await message.edit(content=prompt, view=view)
+    else:
+        message = await interaction.followup.send(prompt, view=view, ephemeral=True)
+    
     await view.wait()
     
     if not view.value:
-        await interaction.followup.send("No option selected. Operation cancelled.", ephemeral=True)
-        return None
+        if message:
+            await message.edit(content="No option selected. Operation cancelled.", view=None)
+        else:
+            await interaction.followup.send("No option selected. Operation cancelled.", ephemeral=True)
+        return None, message
     
-    return view.value
+    return view.value, message
 
 @command(name='create-preset', description='Create a new preset in the database')
 async def create_preset_command(interaction: discord.Interaction, name: str):
@@ -89,6 +101,7 @@ async def create_preset_command(interaction: discord.Interaction, name: str):
     
     pw = None
     browser = None
+    message = None
     
     try:
         pw, browser, page = await setup_browser_and_page()
@@ -98,7 +111,7 @@ async def create_preset_command(interaction: discord.Interaction, name: str):
             await interaction.followup.send("Failed to retrieve track names from simulator.", ephemeral=True)
             return
         
-        track_name = await select_option(interaction, track_names, "Select track name:")
+        track_name, message = await select_option(interaction, track_names, "Select track name:", message)
         if not track_name:
             return
         
@@ -106,37 +119,37 @@ async def create_preset_command(interaction: discord.Interaction, name: str):
         
         track_lengths = await get_track_lengths(page)
         if not track_lengths:
-            await interaction.followup.send("Failed to retrieve track lengths from simulator.", ephemeral=True)
+            await message.edit(content="Failed to retrieve track lengths from simulator.", view=None)
             return
         
-        track_length = await select_option(interaction, track_lengths, "Select track length:")
+        track_length, message = await select_option(interaction, track_lengths, "Select track length:", message)
         if not track_length:
             return
         
         grounds = await get_grounds(page)
         if not grounds:
-            await interaction.followup.send("Failed to retrieve grounds from simulator.", ephemeral=True)
+            await message.edit(content="Failed to retrieve grounds from simulator.", view=None)
             return
         
-        ground = await select_option(interaction, grounds, "Select ground condition:")
+        ground, message = await select_option(interaction, grounds, "Select ground condition:", message)
         if not ground:
             return
         
         weathers = await get_weathers(page)
         if not weathers:
-            await interaction.followup.send("Failed to retrieve weather options from simulator.", ephemeral=True)
+            await message.edit(content="Failed to retrieve weather options from simulator.", view=None)
             return
         
-        weather = await select_option(interaction, weathers, "Select weather:")
+        weather, message = await select_option(interaction, weathers, "Select weather:", message)
         if not weather:
             return
         
         seasons = await get_seasons(page)
         if not seasons:
-            await interaction.followup.send("Failed to retrieve seasons from simulator.", ephemeral=True)
+            await message.edit(content="Failed to retrieve seasons from simulator.", view=None)
             return
         
-        season = await select_option(interaction, seasons, "Select season:")
+        season, message = await select_option(interaction, seasons, "Select season:", message)
         if not season:
             return
         
@@ -154,23 +167,31 @@ async def create_preset_command(interaction: discord.Interaction, name: str):
             session.add(preset)
             session.commit()
             
-            await interaction.followup.send(
-                f"Preset `{name}` created successfully!\n"
-                f"Track: `{track_name}`\n"
-                f"Length: `{track_length}`\n"
-                f"Condition: `{ground}`\n"
-                f"Weather: `{weather}`\n"
-                f"Season: `{season}`",
-                ephemeral=True
+            await message.edit(
+                content=(
+                    f"Preset `{name}` created successfully!\n"
+                    f"Track: `{track_name}`\n"
+                    f"Length: `{track_length}`\n"
+                    f"Condition: `{ground}`\n"
+                    f"Weather: `{weather}`\n"
+                    f"Season: `{season}`"
+                ),
+                view=None
             )
         except Exception as e:
             session.rollback()
-            await interaction.followup.send(f"Failed to save preset to database: {str(e)}", ephemeral=True)
+            if message:
+                await message.edit(content=f"Failed to save preset to database: {str(e)}", view=None)
+            else:
+                await interaction.followup.send(f"Failed to save preset to database: {str(e)}", ephemeral=True)
         finally:
             session.close()
             
     except Exception as e:
-        await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
+        if message:
+            await message.edit(content=f"An error occurred: {str(e)}", view=None)
+        else:
+            await interaction.followup.send(f"An error occurred: {str(e)}", ephemeral=True)
     finally:
         if browser:
             await browser.close()
@@ -214,6 +235,7 @@ async def delete_preset_command(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     
     session = SessionLocal()
+    message = None
     try:
         presets = session.query(Preset).all()
         
@@ -224,10 +246,10 @@ async def delete_preset_command(interaction: discord.Interaction):
         preset_options = []
         for preset in presets:
             preset_options.append(
-                f"{preset.track_name} - {preset.track_length} ({preset.ground}, {preset.weather}, {preset.season})"
+                f"`{preset.name}`: {preset.track_name} - {preset.track_length} ({preset.ground}, {preset.weather}, {preset.season})"
             )
         
-        selected_preset_str = await select_option(
+        selected_preset_str, message = await select_option(
             interaction,
             preset_options,
             "Select a preset to delete:"
@@ -242,19 +264,24 @@ async def delete_preset_command(interaction: discord.Interaction):
         session.delete(preset_to_delete)
         session.commit()
         
-        await interaction.followup.send(
-            f"Preset deleted successfully!\n"
-            f"Track: `{preset_to_delete.track_name}`\n"
-            f"Length: {preset_to_delete.track_length}\n"
-            f"Condition: `{preset_to_delete.ground}`\n"
-            f"Weather: `{preset_to_delete.weather}`\n"
-            f"Season: `{preset_to_delete.season}`",
-            ephemeral=True
+        await message.edit(
+            content=(
+                f"Preset `{preset_to_delete.name}` deleted successfully!\n"
+                f"Track: `{preset_to_delete.track_name}`\n"
+                f"Length: {preset_to_delete.track_length}\n"
+                f"Condition: `{preset_to_delete.ground}`\n"
+                f"Weather: `{preset_to_delete.weather}`\n"
+                f"Season: `{preset_to_delete.season}`"
+            ),
+            view=None
         )
         
     except Exception as e:
         session.rollback()
-        await interaction.followup.send(f"Failed to delete preset: {str(e)}", ephemeral=True)
+        if message:
+            await message.edit(content=f"Failed to delete preset: {str(e)}", view=None)
+        else:
+            await interaction.followup.send(f"Failed to delete preset: {str(e)}", ephemeral=True)
     finally:
         session.close()
 
