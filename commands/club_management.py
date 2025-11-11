@@ -4,10 +4,13 @@ from utils.db import SessionLocal, Club
 from discord import app_commands
 from utils.discord import command
 
-@has_permissions(administrator=True)
 @command(name='create-club', description='Create a new club')
 @app_commands.describe(club_name='Name of the club to create')
 async def create_club_command(interaction: discord.Interaction, club_name: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to create clubs.", ephemeral=True)
+        return
+
     guild_id = str(interaction.guild_id)
     
     session = SessionLocal()
@@ -31,9 +34,12 @@ async def create_club_command(interaction: discord.Interaction, club_name: str):
     finally:
         session.close()
 
-@has_permissions(administrator=True)
 @command(name='list-clubs', description='List all clubs in this server')
 async def list_clubs_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to list clubs.", ephemeral=True)
+        return
+
     guild_id = str(interaction.guild_id)
     
     session = SessionLocal()
@@ -58,10 +64,13 @@ async def list_clubs_command(interaction: discord.Interaction):
     finally:
         session.close()
 
-@has_permissions(administrator=True)
 @command(name='delete-club', description='Delete a club')
 @app_commands.describe(club_name='Name of the club to delete')
 async def delete_club_command(interaction: discord.Interaction, club_name: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to delete clubs.", ephemeral=True)
+        return
+
     guild_id = str(interaction.guild_id)
     
     session = SessionLocal()

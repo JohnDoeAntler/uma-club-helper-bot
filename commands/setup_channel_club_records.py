@@ -78,7 +78,10 @@ async def handle_multiple_clubs(interaction, clubs):
         
         await message.edit(embed=success_embed)
 
-@has_permissions(administrator=True)
 @command(name='setup-channel-club-records', description='Setup channel for storing club records')
 async def setup_channel_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to setup channel for club records.", ephemeral=True)
+        return
+
     await handle_club_selection(interaction, handle_single_club, handle_multiple_clubs)

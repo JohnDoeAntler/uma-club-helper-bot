@@ -4,9 +4,12 @@ from utils.config import get_env
 from utils.db import engine, Base
 from utils.discord import command
 
-@has_permissions(administrator=True)
 @command(name='nuke-db', description='[DEV] Drop and recreate all database tables')
 async def handle_nuke_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to nuke the database.", ephemeral=True)
+        return
+
     if get_env() != 'DEV':
         await interaction.response.send_message("This command is only available in development environment.", ephemeral=True)
         return

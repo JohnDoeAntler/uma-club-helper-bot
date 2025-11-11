@@ -31,9 +31,12 @@ def toggle_channel_for_veteran_uma(channel_id: str, created_by: str):
     finally:
         session.close()
 
-@has_permissions(administrator=True)
 @command(name='setup-channel-veteran-uma', description='Setup channel for processing veteran uma screenshots')
 async def setup_channel_veteran_uma_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to setup channel for veteran uma screenshots.", ephemeral=True)
+        return
+
     try:
         channel_id = str(interaction.channel.id)
         created_by = str(interaction.user.id)

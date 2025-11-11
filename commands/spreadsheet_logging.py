@@ -143,10 +143,13 @@ async def handle_multiple_clubs_disable(interaction, clubs):
             )
             await message.edit(embed=success_embed)
 
-@has_permissions(administrator=True)
 @command(name='enable-spreadsheet-logging', description='Enable spreadsheet logging for a club')
 @app_commands.describe(spreadsheet_id='The Google Sheets spreadsheet ID')
 async def enable_spreadsheet_logging_command(interaction: discord.Interaction, spreadsheet_id: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to enable spreadsheet logging.", ephemeral=True)
+        return
+
     async def single_handler(interaction, club):
         await handle_single_club_enable(interaction, club, spreadsheet_id)
     
@@ -155,9 +158,12 @@ async def enable_spreadsheet_logging_command(interaction: discord.Interaction, s
     
     await handle_club_selection(interaction, single_handler, multi_handler)
 
-@has_permissions(administrator=True)
 @command(name='disable-spreadsheet-logging', description='Disable spreadsheet logging for a club')
 async def disable_spreadsheet_logging_command(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You do not have permission to disable spreadsheet logging.", ephemeral=True)
+        return
+
     async def single_handler(interaction, club):
         await handle_single_club_disable(interaction, club)
     
