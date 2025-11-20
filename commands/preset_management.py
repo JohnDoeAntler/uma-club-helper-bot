@@ -9,7 +9,7 @@ async def setup_browser_and_page():
     context = await browser.new_context(permissions=["clipboard-read", "clipboard-write"])
     page = await context.new_page()
     await page.set_viewport_size({"width": 1920, "height": 1080})
-    await page.goto("https://alpha123.github.io/uma-tools/umalator-global")
+    await page.goto("https://kachi-dev.github.io/uma-tools/umalator-global/")
     await page.wait_for_timeout(1000)
 
     return pw, browser, page
