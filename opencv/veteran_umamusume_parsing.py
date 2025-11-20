@@ -224,8 +224,8 @@ def parse_aptitude(image: MatLike, box: tuple[int, int, int, int]):
 def parse_aptitude_section(image: MatLike):
     crop = crop_image(image, (123, 286, image.shape[1] - 148, 102))
 
-    p = posterization(crop, 10)
-    floodfilled = cv2.floodFill(p, None, (0, 0), (0, 0, 0))[1]
+    floodfilled = cv2.floodFill(crop, None, (0, 0), (0, 0, 0), (5, 5, 5, 0), (10, 10, 10, 0))[1]
+    floodfilled = posterization(floodfilled, 10)
     floodfilled = cv2.cvtColor(floodfilled, cv2.COLOR_BGR2GRAY)
     contours, _ = cv2.findContours(floodfilled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     boxes = [cv2.boundingRect(contour) for contour in contours]
