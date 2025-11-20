@@ -35,12 +35,13 @@ async def input_skills(page: Page, info: dict[str, any]):
     ''')
 
     skills = list(skills_dict.keys())
-    true_skils = []
+    true_skils = set()
     for skill in info["skills"]:
         match = fuzzy_match(skill, skills)
         if match == unique_skill_name:
             continue
-        true_skils.append(match)
+
+        true_skils.add(match)
 
     skills_ids = [skills_dict[skill] for skill in true_skils]
 
